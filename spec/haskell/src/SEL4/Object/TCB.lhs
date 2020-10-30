@@ -273,11 +273,11 @@ The "SetSchedParams" call sets both the priority and the MCP in a single call.
 >             blockedAndUnreleased <- withoutFailure $
 >                 (isBlocked tcbPtr) `andM` (liftM not $ scReleased scPtr)
 >             when blockedAndUnreleased $ throw IllegalOperation
->             return $ Just scPtr
+>             return $ Just (Just scPtr)
 >         NullCap -> do
 >             curTcbPtr <- withoutFailure getCurThread
 >             when (tcbPtr == curTcbPtr) $ throw IllegalOperation
->             return Nothing
+>             return $ Just Nothing
 >         _ -> throw $ InvalidCapability 2
 >     when (not $ isValidFaultHandler fhCap) $ throw $ InvalidCapability 3
 >     return $ ThreadControlSched {
@@ -500,10 +500,12 @@ The use of "checkCapAt" addresses a corner case in which the only capability to 
 >             maybe (return ()) (setPriority target) priority'
 >             targetScOpt <- mapTCBPtr target tcbSchedContext
 >             case sc of
->                 Just scPtr -> when (sc /= targetScOpt) $ schedContextBindTCB scPtr target
->                 Nothing -> case targetScOpt of
->                     Just targetSc -> schedContextUnbindTCB targetSc
->                     Nothing -> return ()
+>                 Nothing -> return ()
+>                 Just Nothing -> case targetScOpt of
+>                                     Nothing -> return ()
+>                                     Just targetSc -> schedContextUnbindTCB targetSc
+>                 Just (Just scPtr) -> 
+>                     when (sc /= Just targetScOpt) $ schedContextBindTCB scPtr target
 >         return []
 
 \subsubsection{Register State}
