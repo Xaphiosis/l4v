@@ -2723,20 +2723,120 @@ lemma decodeSetSchedParams_wf[wp]:
          simp)
   done *)
 
+(* FIXME RT: move to...? *)
+lemma cap_rel_valid_fh:
+  "cap_relation a b \<Longrightarrow> valid_fault_handler a = isValidFaultHandler b"
+  apply (case_tac a
+         ; case_tac b
+         ; simp add: valid_fault_handler_def isValidFaultHandler_def)
+  apply (rule iffI
+         ; clarsimp simp: has_handler_rights_def split: bool.split_asm)
+  done
+
+lemma whenE_throwError_left_corres:
+  assumes nothrow: "\<not>Q \<Longrightarrow> corres (ser \<oplus> r) P P' (m ()) m'"
+      and throw: "Q \<Longrightarrow> (\<And>s. \<lbrace>P' and (\<lambda>s'. (s, s') \<in> state_relation)\<rbrace>
+                              m'
+                              \<lbrace>\<lambda>_. \<bottom>\<rbrace>,\<lbrace>\<lambda>e' t'. ser e e' \<and> (s, t') \<in> state_relation\<rbrace>)"
+      and nofail: "no_fail P' m'"
+  shows "corres (ser \<oplus> r) P P' (whenE Q (throwError e) >>=E m) m'"
+  apply (clarsimp simp: whenE_def)
+  apply (case_tac Q; clarsimp simp: nothrow)
+  apply (clarsimp simp: corres_underlying_def throwError_def return_def
+                        nofail[unfolded no_fail_def])
+  apply (rename_tac s s' x t')
+  apply (frule throw)
+  apply (clarsimp simp: validE_def)
+  apply (frule(1) use_valid)
+   apply simp
+  apply (case_tac x; simp)
+  done
+
 lemma decode_set_sched_params_corres:
   "\<lbrakk> cap_relation cap cap'; is_thread_cap cap; slot' = cte_map slot;
      list_all2 (\<lambda>(c, sl) (c', sl'). cap_relation c c' \<and> sl' = cte_map sl) extras extras' \<rbrakk> \<Longrightarrow>
    corres (ser \<oplus> tcbinv_relation)
-       (cur_tcb and valid_etcbs and (\<lambda>s. \<forall>x \<in> set extras. s \<turnstile> (fst x)))
+       (cur_tcb and (\<lambda>s. \<forall>x \<in> set extras. s \<turnstile> (fst x)))
        (invs' and (\<lambda>s. \<forall>x \<in> set extras'. s \<turnstile>' (fst x)))
        (decode_set_sched_params args cap slot extras)
        (decodeSetSchedParams args cap' slot' extras')"
   apply (simp add: decode_set_sched_params_def decodeSetSchedParams_def)
   apply (cases "length args < 2")
    apply (clarsimp split: list.split)
-  apply (cases "length extras < 1")
+  apply (cases "length extras < 3")
    apply (clarsimp split: list.split simp: list_all2_Cons2)
   apply (clarsimp simp: list_all2_Cons1 neq_Nil_conv val_le_length_Cons linorder_not_less)
+  apply (rule corres_split_eqrE)
+     apply (rule corres_split_norE[OF _ check_prio_corres])
+       apply (rule corres_split_norE[OF _ check_prio_corres])
+         apply (case_tac cap; clarsimp)
+         apply (rename_tac a b c d e sc_cap f g fh i j k l sc_cap' fh' n auth_tcb tcb_ptr)
+         apply (prop_tac "corres (ser \<oplus> (\<lambda>r r'. tc_new_sc r = Some r')) P P'
+                                 (decode_update_sc (cap.ThreadCap tcb_ptr) slot sc_cap)
+                                 (case sc_cap' of capability.NullCap \<Rightarrow>
+                                      doE curTcbPtr <- withoutFailure getCurThread;
+                                          whenE (tcb_ptr = curTcbPtr) $
+                                            throw Fault_H.syscall_error.IllegalOperation;
+                                          returnOk Nothing
+                                      odE
+                                  | capability.SchedContextCap scPtr x \<Rightarrow> doE tcbSc <- withoutFailure $ threadGet tcbSchedContext tcb_ptr;
+                                                             whenE (tcbSc \<noteq> Nothing) $ throw Fault_H.syscall_error.IllegalOperation;
+                                                             scTcb <- withoutFailure $ mapScPtr scPtr scTCB;
+                                                             whenE (scTcb \<noteq> Nothing) $ throw Fault_H.syscall_error.IllegalOperation;
+                                                             blockedAndUnreleased <- withoutFailure $ isBlocked tcb_ptr `~andM~` (liftM Not $ scReleased scPtr);
+                                                             whenE blockedAndUnreleased $ throw Fault_H.syscall_error.IllegalOperation;
+                                                             returnOk $ Just scPtr
+                                                         odE
+                                  | _ \<Rightarrow> throw $ Fault_H.syscall_error.InvalidCapability 2)")
+          apply (rule corres_guard_imp)
+            apply (case_tac "sc_cap = cap.NullCap"
+                   ; clarsimp simp: decode_update_sc_def)
+             apply (rule corres_split_eqrE)
+                apply (rule whenE_throwError_corres'; simp)
+                apply (rule corres_returnOkTT; simp)
+               apply simp
+               apply (rule gct_corres)
+              apply wpsimp+
+find_theorems "corres_underlying" "(_ \<Longrightarrow> _) \<Longrightarrow> _"
+thm corres_split_eqrE
+           find_theorems corres_underlying liftE
+find_theorems cur_thread corres_underlying
+(*
+         apply (case_tac cap
+                ; clarsimp simp: decode_update_sc_def)
+         apply (rename_tac a b c d e sc_cap f g fh i j k l sc_cap' fh' n auth_tcb tcb_ptr)
+         apply (case_tac "sc_cap = cap.NullCap"
+                ; simp add: bindE_assoc unlessE_whenE)
+          apply (rule corres_split_eqrE)
+             apply (rule corres_split_norE)
+                apply (clarsimp simp: check_handler_ep_def bindE_assoc unlessE_whenE)
+                apply (rule whenE_throwError_corres'
+                       ; clarsimp simp: syscall_error_map_def cap_rel_valid_fh)
+                apply (rule corres_returnOkTT)
+                apply (clarsimp simp: newroot_rel_def)
+               apply (rule corres_whenE
+                      ; clarsimp simp: syscall_error_map_def)
+              apply wpsimp+
+            apply (rule gct_corres)
+           apply wpsimp+
+         apply (prop_tac "sc_cap' \<noteq> capability.NullCap")
+          apply (case_tac sc_cap; clarsimp)
+         apply (clarsimp simp: liftE_bindE)
+         apply (rule whenE_throwError_left_corres)
+            apply (rule corres_symb_exec_l, rule whenE_throwError_left_corres)+
+            apply (rule corres_symb_exec_l)
+thm decode_update_sc_def
+thm decode_tcb_configure_def
+desugar_term "doE x <- m; m' odE" "doE"
+thm liftE_bindE
+thm corres_symb_exec_l[where m="liftE a >>=E b", folded liftE_bindE]
+thm hoare_drop_impE
+find_theorems (100) "corres_underlying _ _ _ _ _ _ (_ >>= _)" "_ \<Longrightarrow> _"
+find_theorems cap_relation valid_fault_handler
+                 apply (case_tac fh; simp)
+find_theorems unlessE throwError
+find_theorems cur_thread corres_underlying
+find_theorems valid_fault_handler isValidFaultHandler*)
   sorry (*
   apply (rule corres_split_eqrE)
      apply (rule corres_split_norE[OF _ check_prio_corres])

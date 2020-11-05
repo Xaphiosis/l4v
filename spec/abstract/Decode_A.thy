@@ -320,26 +320,26 @@ definition
   decode_update_sc :: "cap \<Rightarrow> cslot_ptr \<Rightarrow> cap \<Rightarrow> (tcb_invocation,'z::state_ext) se_monad"
 where
   "decode_update_sc cap slot sc_cap \<equiv>
-    if sc_cap = NullCap then doE
-      tcb_ptr \<leftarrow> returnOk $ obj_ref_of cap;
-      ct_ptr \<leftarrow> liftE $ gets cur_thread;
-      whenE (tcb_ptr = ct_ptr) $ throwError IllegalOperation;
-      returnOk $ ThreadControlSched (obj_ref_of cap) slot None None None (Some None)
-  odE
-    else doE
-      tcb_ptr \<leftarrow> returnOk $ obj_ref_of cap;
-      unlessE (is_sched_context_cap sc_cap) $ throwError (InvalidCapability 0);
-      sc_ptr \<leftarrow> returnOk $ obj_ref_of sc_cap;
-      sc_ptr' \<leftarrow> liftE $ get_tcb_obj_ref tcb_sched_context tcb_ptr;
-      whenE (sc_ptr' \<noteq> None) $ throwError IllegalOperation;
-      sc \<leftarrow> liftE $ get_sched_context sc_ptr;
-      whenE (sc_tcb sc \<noteq> None) $ throwError IllegalOperation;
-      st \<leftarrow> liftE $ get_thread_state tcb_ptr;
-      released \<leftarrow> liftE $ get_sc_released sc_ptr;
-      whenE (ipc_queued_thread_state st \<and> \<not>released) $
-        throwError IllegalOperation;
-      returnOk $ ThreadControlSched tcb_ptr slot None None None (Some (Some sc_ptr))
-    odE"
+    (case sc_cap of
+       NullCap \<Rightarrow>
+         doE tcb_ptr \<leftarrow> returnOk $ obj_ref_of cap;
+             ct_ptr \<leftarrow> liftE $ gets cur_thread;
+             whenE (tcb_ptr = ct_ptr) $ throwError IllegalOperation;
+             returnOk $ ThreadControlSched (obj_ref_of cap) slot None None None (Some None)
+         odE
+     | SchedContextCap _ _ \<Rightarrow>
+         doE tcb_ptr \<leftarrow> returnOk $ obj_ref_of cap;
+             sc_ptr \<leftarrow> returnOk $ obj_ref_of sc_cap;
+             sc_ptr' \<leftarrow> liftE $ get_tcb_obj_ref tcb_sched_context tcb_ptr;
+             whenE (sc_ptr' \<noteq> None) $ throwError IllegalOperation;
+             sc \<leftarrow> liftE $ get_sched_context sc_ptr;
+             whenE (sc_tcb sc \<noteq> None) $ throwError IllegalOperation;
+             st \<leftarrow> liftE $ get_thread_state tcb_ptr;
+             released \<leftarrow> liftE $ get_sc_released sc_ptr;
+             whenE (ipc_queued_thread_state st \<and> \<not>released) $ throwError IllegalOperation;
+             returnOk $ ThreadControlSched tcb_ptr slot None None None (Some (Some sc_ptr))
+         odE
+     | _ \<Rightarrow> throwError (InvalidCapability 2)"
 
 definition
   decode_tcb_configure ::
