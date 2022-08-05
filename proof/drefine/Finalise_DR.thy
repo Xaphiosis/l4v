@@ -2787,7 +2787,7 @@ lemma monadic_trancl_f:
 lemma monadic_trancl_step:
   "monadic_rewrite False False \<top>
        (monadic_trancl f x) (do y \<leftarrow> f x; monadic_trancl f y od)"
-  apply (rule monadic_rewrite_imp)
+  apply (rule monadic_rewrite_guard_imp)
    apply (rule monadic_rewrite_trans)
     apply (rule monadic_trancl_steps)
    apply (rule monadic_rewrite_bind_head)
@@ -2828,7 +2828,7 @@ lemma monadic_trancl_preemptible_steps:
       (doE y \<leftarrow> monadic_trancl_preemptible f x;
               monadic_trancl_preemptible f y odE)"
   apply (simp add: monadic_trancl_preemptible_def)
-  apply (rule monadic_rewrite_imp)
+  apply (rule monadic_rewrite_guard_imp)
    apply (rule monadic_rewrite_trans)
     apply (rule monadic_trancl_steps)
    apply (simp add: bindE_def)
@@ -2845,7 +2845,7 @@ lemma monadic_trancl_preemptible_f:
   "monadic_rewrite False False (\<lambda>_. True)
      (monadic_trancl_preemptible f x) (f x)"
   apply (simp add: monadic_trancl_preemptible_def)
-  apply (rule monadic_rewrite_imp)
+  apply (rule monadic_rewrite_guard_imp)
    apply (rule monadic_rewrite_trans)
     apply (rule monadic_trancl_f)
    apply (simp add: lift_def)
@@ -2858,7 +2858,7 @@ lemma monadic_trancl_preemptible_step:
       (monadic_trancl_preemptible f x)
       (doE y \<leftarrow> f x;
             monadic_trancl_preemptible f y odE)"
-  apply (rule monadic_rewrite_imp)
+  apply (rule monadic_rewrite_guard_imp)
    apply (rule monadic_rewrite_trans)
     apply (rule monadic_trancl_preemptible_steps)
    apply (rule monadic_rewrite_bindE_head)
@@ -2870,7 +2870,7 @@ lemma monadic_trancl_preemptible_return:
   "monadic_rewrite False False (\<lambda>_. True)
      (monadic_trancl_preemptible f x) (returnOk x)"
   apply (simp add: monadic_trancl_preemptible_def)
-  apply (rule monadic_rewrite_imp)
+  apply (rule monadic_rewrite_guard_imp)
    apply (rule monadic_rewrite_trans)
     apply (rule monadic_trancl_return)
    apply (simp add: returnOk_def)
@@ -3220,7 +3220,7 @@ lemma finalise_slot_inner1_add_if_Null:
      od)"
   supply if_cong[cong]
   apply (simp add: finalise_slot_inner1_def)
-  apply (rule monadic_rewrite_imp)
+  apply (rule monadic_rewrite_guard_imp)
    apply (rule monadic_rewrite_bind_tail)
     apply (rule monadic_rewrite_if_rhs)
      apply (simp add: PageTableUnmap_D.is_final_cap_def)
