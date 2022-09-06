@@ -701,7 +701,7 @@ lemma cap_revoke_corres_helper:
   show ?case
   supply if_cong[cong]
   apply (subst cap_revoke.simps)
-  apply (rule monadic_rewrite_corres2[where P =\<top>,simplified])
+  apply (rule monadic_rewrite_corres_l[where P =\<top>,simplified])
    apply (rule Finalise_DR.monadic_trancl_preemptible_step)
   apply (rule dcorres_expand_pfx)
   apply (clarsimp simp:liftE_bindE)
@@ -720,7 +720,7 @@ lemma cap_revoke_corres_helper:
             apply (clarsimp simp:empty_set_eq)+
             apply (clarsimp simp:returnOk_def lift_def)
             apply (rule corres_guard_imp)
-              apply (rule monadic_rewrite_corres2[where P=\<top> ,simplified])
+              apply (rule monadic_rewrite_corres_l[where P=\<top> ,simplified])
                apply (rule monadic_trancl_preemptible_return)
               apply (rule corres_trivial)
               apply (clarsimp simp:returnOk_def boolean_exception_def)+
@@ -735,7 +735,7 @@ lemma cap_revoke_corres_helper:
               apply simp+
             apply (clarsimp simp: lift_def empty_set_eq)+
             apply (rule corres_guard_imp)
-              apply (rule monadic_rewrite_corres2[where P=\<top> ,simplified])
+              apply (rule monadic_rewrite_corres_l[where P=\<top> ,simplified])
                apply (rule monadic_trancl_preemptible_return)
               apply (rule corres_trivial)
               apply (clarsimp simp:returnOk_def boolean_exception_def)+
