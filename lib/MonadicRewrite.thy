@@ -332,7 +332,6 @@ lemma monadic_rewrite_symb_exec_l_known_F:
   by (erule monadic_rewrite_trans[rotated])
      (rule monadic_rewrite_symb_exec_l_F[OF monadic_rewrite_pre_imp_refl]; simp)
 
-(* FIXME RAF: does the order of (P and P' and Q) affect anything when used in proofs? *)
 lemma monadic_rewrite_symb_exec_l_known_nF:
   "\<lbrakk> monadic_rewrite False E Q (x rv) y;
      \<And>P. m \<lbrace>P\<rbrace>; empty_fail m; no_fail P' m;
@@ -346,7 +345,6 @@ lemmas monadic_rewrite_symb_exec_l_known
   = monadic_rewrite_symb_exec_l_known_F
     monadic_rewrite_symb_exec_l_known_nF
 
-(* FIXME RAF: does the order of (P and P' and Q) affect anything when used in proofs? *)
 lemma monadic_rewrite_symb_exec_r_known_E:
   "\<lbrakk> monadic_rewrite F True Q x (y rv);
      \<And>P. m \<lbrace>P\<rbrace>; empty_fail m; no_fail P' m;
@@ -357,7 +355,6 @@ lemma monadic_rewrite_symb_exec_r_known_E:
    apply (rule monadic_rewrite_symb_exec_r_E[OF monadic_rewrite_pre_imp_refl, rotated -1], simp+)
   done
 
-(* FIXME RAF: does the order of (P and P' and Q) affect anything when used in proofs? *)
 lemma monadic_rewrite_symb_exec_r_known_nE:
   "\<lbrakk> monadic_rewrite F False Q x (y rv);
      \<And>P. m \<lbrace>P\<rbrace>; no_fail P' m;
@@ -763,7 +760,7 @@ method monadic_rewrite_r_method methods action finalise =
 
 (* Rewrite LHS using a single rule application that works on the head of a bind,
    then cleanup with finalise.
-   E.g. using \<open>rule monadic_rewrite_if_lhs_True\<close> \<open>wpsimp\<close> *)
+   E.g. using \<open>wpsimp\<close> r: monadic_rewrite_if_l_True *)
 method monadic_rewrite_l methods finalise uses r =
   monadic_rewrite_l_method \<open>monadic_rewrite_solve_head \<open>rule r\<close>\<close> finalise
 
