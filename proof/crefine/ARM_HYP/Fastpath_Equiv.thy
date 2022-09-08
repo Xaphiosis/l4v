@@ -104,29 +104,32 @@ method_setup method_with_only_rule_tac =
     tac ctxt facts
   end)\<close> \<open>Given name of Eisbach method m and a rule r, apply (m \<open>rule r\<close>)\<close>
 
-(* FIXME RAF move these to MonadicRewrite *)
-method monadic_rewrite_l_internal methods finalise uses r =
-  monadic_rewrite_l_method \<open>monadic_rewrite_solve_head \<open>rule r\<close>\<close> finalise
-method monadic_rewrite_r_internal methods finalise uses r =
-  monadic_rewrite_r_method \<open>monadic_rewrite_solve_head \<open>rule r\<close>\<close> finalise
-
 ML \<open>
-(* Rather than having the strange order of (monadic_rewrite_l <cleanup> r: my_rule) we can have
-   the expected (monadic_rewrite_l my_rule <cleanup>).
-   Since this is the simple case of a single pass, we require exactly one theorem. *)
-fun monadic_rewrite_simple_nicer_syntax method_name =
+(* monadic_rewrite_l/r_method \<open>monadic_rewrite_solve_head \<open>rule r\<close>\<close> finalise *)
+fun monadic_rewrite_rl monadic_rewrite_rl_method_name =
   Attrib.thm -- Method.text_closure >> (fn (thm, m) => fn ctxt => fn facts =>
   let
+    (* rule r *)
+    fun rtac st = METHOD (HEADGOAL o Method.rule_tac st [thm]);
+    (* monadic_rewrite_solve_head \<open>rule r\<close> *)
+    fun mr_sh_tac st = Method_Closure.apply_method st @{method monadic_rewrite_solve_head}
+                                                   [] [] [rtac] st;
+    (* finalise *)
     fun mtac st = METHOD (method_evaluate m st);
-    fun tac st = Method_Closure.apply_method st method_name [] [[thm]] [mtac] st;
+    (* assemble *)
+    fun tac st = Method_Closure.apply_method st monadic_rewrite_rl_method_name
+                                             [] [] [mr_sh_tac, mtac] st;
   in
     tac ctxt facts
   end)\<close>
 
-method_setup monadic_rewrite_l =
-  \<open>monadic_rewrite_simple_nicer_syntax @{method monadic_rewrite_l_internal}\<close>
-method_setup monadic_rewrite_r =
-  \<open>monadic_rewrite_simple_nicer_syntax @{method monadic_rewrite_r_internal}\<close>
+(* FIXME RAF: attempt to make the finalise part optional, filling it in with solves wpsimp if
+   it's absent *)
+
+method_setup monadic_rewrite_l = \<open>monadic_rewrite_rl @{method monadic_rewrite_l_method}\<close>
+
+method_setup monadic_rewrite_r = \<open>monadic_rewrite_rl @{method monadic_rewrite_r_method}\<close>
+
 
 
 lemma setCTE_obj_at'_queued:
