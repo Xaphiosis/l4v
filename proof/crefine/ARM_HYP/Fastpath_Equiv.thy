@@ -42,29 +42,80 @@ method monadic_rewrite_symb_exec_resolutions methods m =
   \<open>if_then_else \<open>has_concl "?f \<lbrace>?P\<rbrace>"\<close> m
    fail\<close>\<close>\<close>\<close>
 
-(* Drop statement on LHS/RHS using symbolic execution. In nearly all cases, the side conditions
-   should be solvable by wpsimp, but the _m versions allow specifying a method or wpsimp options. *)
-method monadic_rewrite_drop_l_m methods m =
-  rule monadic_rewrite_symb_exec_l_drop; (monadic_rewrite_symb_exec_resolutions m)?
-method monadic_rewrite_drop_r_m methods m =
-  rule monadic_rewrite_symb_exec_r_drop; (monadic_rewrite_symb_exec_resolutions m)?
-method monadic_rewrite_drop_l = monadic_rewrite_drop_l_m \<open>solves wpsimp\<close>
-method monadic_rewrite_drop_r = monadic_rewrite_drop_r_m \<open>solves wpsimp\<close>
-
 (* Symbolically execute non-state-modifying statement on LHS/RHS. In nearly all cases, the side
    conditions should be solvable by wpsimp, but the _m versions allow specifying a method or
    wpsimp options. *)
 method monadic_rewrite_symb_exec methods r m =
   (no_name_eta, r; (monadic_rewrite_symb_exec_resolutions m)?)
-(* try use specific-flag rules first, falling back on generic symbolic execution rule *)
-method monadic_rewrite_symb_exec_r_m methods m =
-  monadic_rewrite_symb_exec \<open>rule monadic_rewrite_symb_exec_r monadic_rewrite_symb_exec_r'\<close> m
-method monadic_rewrite_symb_exec_l_m methods m =
-  monadic_rewrite_symb_exec \<open>rule monadic_rewrite_symb_exec_l monadic_rewrite_symb_exec_l'\<close> m
-method monadic_rewrite_symb_exec_r = monadic_rewrite_symb_exec_r_m \<open>solves wpsimp\<close>
-method monadic_rewrite_symb_exec_l = monadic_rewrite_symb_exec_l_m \<open>solves wpsimp\<close>
 
-(* FIXME RAF: that leaves the _known variants *)
+ML \<open>
+val solves_wpsimp =
+  let
+    fun wpsimp st = Method_Closure.apply_method st @{method wpsimp} [] [] [] st
+    fun solves_wpsimp_tac st = Method_Closure.apply_method st @{method solves} [] [] [wpsimp] st
+  in solves_wpsimp_tac end
+\<close>
+
+ML \<open>
+(* monadic_rewrite_l/r_method \<open>monadic_rewrite_solve_head \<open>rule r\<close>\<close> [finalise] *)
+fun monadic_rewrite_rl monadic_rewrite_rl_method_name =
+  Attrib.thm -- (Scan.option Method.text_closure)
+  >> (fn (thm, finalise_method_opt) => fn ctxt => fn facts =>
+  let
+    (* rule r *)
+    fun rtac st = METHOD (HEADGOAL o Method.rule_tac st [thm]);
+    (* monadic_rewrite_solve_head \<open>rule r\<close> *)
+    fun mr_sh_tac st = Method_Closure.apply_method st @{method monadic_rewrite_solve_head}
+                                                   [] [] [rtac] st;
+    (* finalise *)
+    fun finalise_tac st =
+      case finalise_method_opt
+        of SOME m => METHOD (method_evaluate m st)
+         | NONE => solves_wpsimp st
+    (* assemble *)
+    fun tac st = Method_Closure.apply_method st monadic_rewrite_rl_method_name
+                                             [] [] [mr_sh_tac, finalise_tac] st;
+  in
+    tac ctxt facts
+  end)
+
+(* monadic_rewrite_symb_exec \<open>rule rule_thms\<close> [finalise] *)
+fun monadic_rewrite_symb_exec rule_thms =
+  Scan.option Method.text_closure >> (fn finalise_method_opt => fn ctxt => fn facts =>
+  let
+    (* rule rule_thms *)
+    fun rtac st = METHOD (HEADGOAL o Method.rule_tac st rule_thms)
+    (* finalise *)
+    fun finalise_tac st =
+      case finalise_method_opt
+        of SOME m => METHOD (method_evaluate m st)
+         | NONE => solves_wpsimp st
+    (* assemble *)
+    fun tac st = Method_Closure.apply_method st @{method monadic_rewrite_symb_exec}
+                                             [] [] [rtac, finalise_tac] st
+  in
+    tac ctxt facts
+  end)
+\<close>
+
+(* Symbolic execution on LHS/RHS, trying specific-flag rules first,
+   falling back on generic symbolic execution rule.
+   Side-conditions can be discharged with a method if specified, otherwise \<open>solves wpsimp\<close> *)
+method_setup monadic_rewrite_symb_exec_l =
+  \<open>monadic_rewrite_symb_exec @{thms monadic_rewrite_symb_exec_l monadic_rewrite_symb_exec_l'}\<close>
+  \<open>symbolic execution on monadic_rewrite LHS with customisable side-condition method\<close>
+method_setup monadic_rewrite_symb_exec_r =
+  \<open>monadic_rewrite_symb_exec @{thms monadic_rewrite_symb_exec_r monadic_rewrite_symb_exec_r'}\<close>
+  \<open>symbolic execution on monadic_rewrite RHS with customisable side-condition method\<close>
+
+(* Drop statement on LHS/RHS using symbolic execution. In nearly all cases, the side conditions
+   should be solvable by wpsimp, but one can optionally specify a method or wpsimp options. *)
+method_setup monadic_rewrite_drop_l =
+  \<open>monadic_rewrite_symb_exec @{thms monadic_rewrite_symb_exec_l_drop}\<close>
+  \<open>drop monadic_rewrite LHS statement via symbolic execution with customisable side-condition method\<close>
+method_setup monadic_rewrite_drop_r =
+  \<open>monadic_rewrite_symb_exec @{thms monadic_rewrite_symb_exec_r_drop}\<close>
+  \<open>drop monadic_rewrite RHS statement via symbolic execution with customisable side-condition method\<close>
 
 ML \<open>
 structure Multi_Rule_Insts = struct
@@ -79,57 +130,82 @@ val named_insts =
 fun method inst_tac tac =
   Args.goal_spec -- Scan.optional (Scan.lift (named_insts --| Args.$$$ "in")) ([], []) --
   Attrib.thms >> (fn ((quant, (insts, fixes)), thms) => fn ctxt => METHOD (fn facts =>
+let
+  val _ = @{make_string} insts |> writeln
+in
     if null insts andalso null fixes
     then quant (Method.insert_tac ctxt facts THEN' tac ctxt thms)
     else
       map (fn thm => quant (Method.insert_tac ctxt facts THEN' inst_tac ctxt insts fixes thm)) thms
-      |> FIRST))
+      |> FIRST
+end))
+
+(* Instantiate a single named variable in thms with a value, apply to inst_tac *)
+fun single_instantiate_tac inst_tac var_name syn_value fixes thms ctxt facts =
+  let
+    val var = Option.valOf (Lexicon.read_variable var_name)
+    val insts = [((var, Position.none),syn_value)]
+  in
+    map (fn thm => HEADGOAL (Method.insert_tac ctxt facts THEN' inst_tac ctxt insts fixes thm)) thms
+    |> FIRST
+  end
+
+fun single_instantiate_method inst_tac var_name thms =
+  Scan.lift Parse.embedded_inner_syntax -- Scan.lift Parse.for_fixes
+  >> (fn (syn, fixes) => fn ctxt => METHOD (fn facts =>
+        single_instantiate_tac inst_tac var_name syn fixes thms ctxt facts))
 
 end\<close>
 
 method_setup rules_tac = \<open>Multi_Rule_Insts.method Rule_Insts.res_inst_tac resolve_tac\<close>
-  "apply rule (dynamic instantiation for multiple rules containing the same variable with same type)"
-
-
-(* FIXME RAF REMOVE and write down somewhere, this was a ton of work to figure out *)
-method_setup method_with_only_rule_tac =
-  \<open>(Args.context -- Scan.lift Parse.embedded_position >> (uncurry Method.check_name))
-    -- Attrib.thm
-    -- Method.text_closure >> (fn ((method_name, thm), m) => fn ctxt => fn facts =>
-  let
-    fun rtac st = METHOD (HEADGOAL o Method.rule_tac st [thm]);
-    fun mtac st = METHOD (method_evaluate m st);
-    fun tac st = Method_Closure.apply_method st method_name [] [] [rtac, mtac] st;
-  in
-    tac ctxt facts
-  end)\<close> \<open>Given name of Eisbach method m and a rule r, apply (m \<open>rule r\<close>)\<close>
+  "apply rule (dynamic instantiation for multiple thms containing same variable)"
 
 ML \<open>
-(* monadic_rewrite_l/r_method \<open>monadic_rewrite_solve_head \<open>rule r\<close>\<close> finalise *)
-fun monadic_rewrite_rl monadic_rewrite_rl_method_name =
-  Attrib.thm -- Method.text_closure >> (fn (thm, m) => fn ctxt => fn facts =>
+(* apply (monadic_rewrite_symb_exec \<open>rules_tac rv=value in thms\<close> [finalise]) *)
+fun symb_exec_known_method thms =
+  (Scan.lift Parse.embedded_inner_syntax -- Scan.lift Parse.for_fixes
+  -- (Scan.option Method.text_closure))
+  >> (fn ((syn, fixes), finalise_method_opt) => fn ctxt => fn facts =>
   let
-    (* rule r *)
-    fun rtac st = METHOD (HEADGOAL o Method.rule_tac st [thm]);
-    (* monadic_rewrite_solve_head \<open>rule r\<close> *)
-    fun mr_sh_tac st = Method_Closure.apply_method st @{method monadic_rewrite_solve_head}
-                                                   [] [] [rtac] st;
+    (* rules_tac rv=syn in thms *)
+    val rtac = METHOD
+               o Multi_Rule_Insts.single_instantiate_tac Rule_Insts.res_inst_tac "rv" syn fixes thms;
     (* finalise *)
-    fun mtac st = METHOD (method_evaluate m st);
+    fun finalise_tac st =
+      case finalise_method_opt
+        of SOME m => METHOD (method_evaluate m st)
+         | NONE => solves_wpsimp st
     (* assemble *)
-    fun tac st = Method_Closure.apply_method st monadic_rewrite_rl_method_name
-                                             [] [] [mr_sh_tac, mtac] st;
+    fun tac st = Method_Closure.apply_method st @{method monadic_rewrite_symb_exec}
+                                             [] [] [rtac, finalise_tac] st
   in
     tac ctxt facts
-  end)\<close>
+  end)
+\<close>
 
-(* FIXME RAF: attempt to make the finalise part optional, filling it in with solves wpsimp if
-   it's absent *)
+method_setup monadic_rewrite_symb_exec_l_known =
+  \<open>symb_exec_known_method @{thms monadic_rewrite_symb_exec_l_known}\<close>
+  \<open>symbolic execution on monadic_rewrite LHS with known value and customisable side-condition method\<close>
+method_setup monadic_rewrite_symb_exec_r_known =
+  \<open>symb_exec_known_method @{thms monadic_rewrite_symb_exec_r_known}\<close>
+  \<open>symbolic execution on monadic_rewrite RHS with known value and customisable side-condition method\<close>
 
 method_setup monadic_rewrite_l = \<open>monadic_rewrite_rl @{method monadic_rewrite_l_method}\<close>
-
 method_setup monadic_rewrite_r = \<open>monadic_rewrite_rl @{method monadic_rewrite_r_method}\<close>
 
+(* FIXME RAF to go into examples
+lemma
+  assumes a: "\<And>x P. Z x \<Longrightarrow> P (x::nat)"
+  assumes b: "\<And>x P. Y x \<Longrightarrow> P (x::int)"
+  shows "P (2::nat)"
+  apply (rules_tac x=2 in b a)
+lemma "P n \<Longrightarrow> \<exists>x. P x"
+  apply (rules_tac x=n and P=k for z k in exI)
+  oops
+*)
+
+
+(* FIXME RAF migrate everything above *)
 
 
 lemma setCTE_obj_at'_queued:
