@@ -462,7 +462,7 @@ lemma monadic_rewrite_threadGet:
     (threadGet f t) (return v)"
   unfolding getThreadState_def threadGet_def
   apply (simp add: liftM_def)
-  apply (wp_pre, monadic_rewrite_symb_exec_l)
+  apply monadic_rewrite_symb_exec_l
     apply (rule_tac P="\<lambda>_. f x = v" in monadic_rewrite_pre_imp_refl)
     apply blast
    apply (wpsimp wp: OMG_getObject_tcb simp: obj_tcb_at')+
@@ -855,7 +855,7 @@ lemma receiveIPC_simple_rewrite:
   supply empty_fail_getEndpoint[wp]
   apply (rule monadic_rewrite_gen_asm)
   apply (simp add: receiveIPC_def)
-   apply (wp_pre, monadic_rewrite_symb_exec_l_known ep)
+   apply (monadic_rewrite_symb_exec_l_known ep)
       apply monadic_rewrite_symb_exec_l+
             apply (monadic_rewrite_l monadic_rewrite_if_l_False)
             apply (rule monadic_rewrite_is_refl)
@@ -906,8 +906,7 @@ lemma deleteCallerCap_nullcap_rewrite:
      (return ())"
   apply (simp add: deleteCallerCap_def getThreadCallerSlot_def locateSlot_conv
                    getSlotCap_def)
-  apply (monadic_rewrite_l cteDeleteOne_nullcap_rewrite)
-    apply (wp getCTE_wp)
+  apply (monadic_rewrite_l cteDeleteOne_nullcap_rewrite \<open>wpsimp wp: getCTE_wp\<close>)
    apply (monadic_rewrite_symb_exec_l+, rule monadic_rewrite_refl)
     apply (wpsimp simp: cte_wp_at_ctes_of)+
   done
@@ -1216,7 +1215,7 @@ lemma clearUntypedFreeIndex_simple_rewrite:
   apply (simp add: clearUntypedFreeIndex_def getSlotCap_def)
   apply (rule monadic_rewrite_name_pre)
   apply (clarsimp simp: cte_wp_at_ctes_of)
-  apply (wp_pre, monadic_rewrite_symb_exec_l_known cte)
+  apply (monadic_rewrite_symb_exec_l_known cte)
     apply (simp split: capability.split, strengthen monadic_rewrite_refl)
     apply (wpsimp wp: getCTE_wp' simp: cte_wp_at_ctes_of)+
   done

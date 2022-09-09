@@ -719,8 +719,8 @@ lemma transferCaps_simple_rewrite:
   supply empty_fail_getReceiveSlots[wp] (* FIXME *)
   apply (rule monadic_rewrite_gen_asm)
   apply (simp add: transferCaps_simple)
-  apply (monadic_rewrite_symb_exec_l_drop)
-  apply (rule monadic_rewrite_refl)
+  apply (monadic_rewrite_symb_exec_l_drop, rule monadic_rewrite_refl)
+  apply simp
   done
 
 lemma lookupExtraCaps_simple_rewrite:
