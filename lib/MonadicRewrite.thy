@@ -741,9 +741,12 @@ Further notes:
 * if there is no place where action can apply, step until the end and be left with a monadic_rewrite
   goal that finalise will most likely fail on
 * if action does not resolve the monadic_rewrite goal, step will still try to advance, potentially
-  leading to goals that are hard to make sense of *)
+  leading to goals that are hard to make sense of
+* finalise is optional since, in some cases, the action solves the monadic_rewrite goal completely,
+  and during proof development it is useful to see where finalise isn't working
+*)
 method monadic_rewrite_single_pass methods start step action finalise =
-  determ start, (((action | determ step)+), finalise+)[1]
+  determ start, (((action | determ step)+), (finalise+)?)[1]
 
 (* Step over LHS until action applies, then finalise. *)
 method monadic_rewrite_l_method methods action finalise =
