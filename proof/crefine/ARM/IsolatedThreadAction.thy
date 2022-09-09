@@ -633,6 +633,18 @@ lemma getHWASID_isolatable:
             | simp add: page_directory_at_partial_overwrite)+
   done
 
+lemma getTCB_threadGet:
+  "do
+     tcbobj \<leftarrow> getObject t;
+     x \<leftarrow> f (atcbVCPUPtr (tcbArch tcbobj));
+     g x
+   od = do
+     vcpu_ptr \<leftarrow> threadGet (atcbVCPUPtr o tcbArch) t;
+     x \<leftarrow> f vcpu_ptr;
+     g x
+   od"
+   by (simp add: threadGet_def liftM_def)
+
 lemma setVMRoot_isolatable:
   "thread_actions_isolatable idx (setVMRoot t)"
   supply if_split[split del]
