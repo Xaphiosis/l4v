@@ -5262,9 +5262,8 @@ lemma monadic_rewrite_placeNewObject_vcpu_decompose:
                setObject v vcpu
             od)"
   apply clarsimp
-  apply (monadic_rewrite_r monadic_rewrite_modify_setObject_vcpu)
-    apply (rule hoare_post_imp[OF _ placeNewObject_creates_object_vcpu])
-    apply (fastforce simp: ko_at_vcpu_at'D)
+  apply (monadic_rewrite_r monadic_rewrite_modify_setObject_vcpu
+                           \<open>wpsimp wp: placeNewObject_object_at_vcpu\<close>)
    apply (clarsimp simp: placeNewObject_def placeNewObject'_def bind_assoc split_def)
    apply (clarsimp simp: objBits_simps' archObjSize_def)
    apply (rule monadic_rewrite_bind_tail)+
