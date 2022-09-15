@@ -749,10 +749,9 @@ Further notes:
 
 (* we don't want the finalise tactic being applied to the monadic_rewrite goal we just generated
    unless it's exactly what is needed to solve it (e.g. monadic_rewrite_refl) *)
-(* FIXME RAF *)
 method monadic_rewrite_single_pass methods start step action finalise =
   determ start,
-  rev_all_new
+  fwd_all_new
     \<open>(repeat_unless action \<open>determ step\<close>)\<close>
     \<open>if_then_else \<open>has_concl "monadic_rewrite ?F ?E ?P ?r ?l"\<close> succeed finalise\<close>
 

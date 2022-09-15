@@ -3462,7 +3462,6 @@ shows
       apply (rule monadic_rewrite_refl)
      apply wpsimp
     apply (rule monadic_rewrite_refl)
-   apply (simp add: liftE_bindE stateAssert_def2 bind_assoc)
    apply (rule monadic_rewrite_refl)
   apply (clarsimp simp: ex_cte_cap_wp_to'_def excaps_in_mem_def)
   apply (drule(1) bspec)+
