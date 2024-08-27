@@ -112,8 +112,12 @@ in
          let
            val name = if arch then arch_prefix arch_suffix ^ "." ^ orig_name else orig_name
            val local_name = get_proper_nm lthy name;
-           (* look up name again for purposes of document markup (i.e. ctrl+click on names) *)
-           val _ = check_parsed_nm lthy (local_name, pos);
+           (* Look up name again for purposes of document markup (i.e. ctrl+click on names).
+              Do not use the resolved qualified local_name, because while it is somehow possible to
+              create aliases/bindings to consts/type names that have been hidden with
+              hide_const/hide_type, attempting to use them with check_const/check_type_name will
+              fail with "Inaccessible" errors. *)
+           val _ = check_parsed_nm lthy (name, pos);
 
            (* Check whether the short (base) name is already available in theory context if no
               locale target is supplied and the "aliasing" option is not supplied.
@@ -155,8 +159,7 @@ val get_fact_nm = (fst oo global_fact)
    This means that the nice option of using Parse.const + Proof_Context.read_const can't be used
    here.
 
-   Instead, we use read_const/read_type_name on user-supplied names to get resolved names as normal
-   strings, which we then supply to Proof_Context.check_const/check_type_name along with the
+   Instead, we use Proof_Context.check_const/check_type_name on user-supplied names along with the
    position from Parse.position to get markup reports which we apply manually.
 
    For theorems, document annotation appears to be included in Proof_context.get_fact. *)
@@ -224,5 +227,42 @@ end
 
 end
 \<close>
+
+(*
+locale Arch
+context Arch begin arch_global_naming
+datatype vmpage_size =
+    ARMSmallPage
+end
+arch_requalify_types vmpage_size
+
+context begin interpretation Arch . global_naming vmpage_size
+requalify_consts ARMSmallPage
+end
+
+term vmpage_size.ARMSmallPage (* OK *)
+
+(* hide vmpage sizes again *)
+hide_const
+  vmpage_size.ARMSmallPage
+
+find_consts name:ARMSmall
+(* found 1 constant(s):
+   Requalify.AARCH64.vmpage_size.ARMSmallPage :: "vmpage_size" *)
+
+term Requalify.AARCH64.vmpage_size.ARMSmallPage
+(* Inaccessible constant: "Requalify.AARCH64.vmpage_size.ARMSmallPage" *)
+
+context Arch begin
+term vmpage_size.ARMSmallPage (* OK... but how?! *)
+global_naming "AARCH64.vmpage_size" requalify_consts ARMSmallPage
+(* Inaccessible constant: "Requalify.AARCH64.vmpage_size.ARMSmallPage" *)
+global_naming "AARCH64" requalify_consts ARMSmallPage
+(* Inaccessible constant: "Requalify.AARCH64.vmpage_size.ARMSmallPage" *)
+end
+
+term AARCH64.ARMSmallPage (* should work but doesn't due to failed requalify *)
+term Requalify.AARCH64.vmpage_size.ARMSmallPage (* should work but doesn't due to failed requalify *)
+*)
 
 end
