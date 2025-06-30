@@ -9,26 +9,12 @@ theory Bits_R
 imports Corres ArchStateRelationLemmas
 begin
 
+(* FIXME: clearMemory generates a warning on some architectures *)
 crunch_ignore (add:
-  bind withoutFailure throw catchFailure rethrowFailure capFaultOnFailure lookupErrorOnFailure
-  nullCapOnFailure nothingOnFailure withoutPreemption preemptionPoint maskInterrupt unifyFailure
-  ignoreFailure emptyOnFailure clearMemoryVM  assertDerived
-  setObject getObject updateObject loadObject)
-
-(* FIXME arch-split: RISCV64 has bigger set than AARCH64 *)
-crunch_ignore (add:
-  bind return "when" get gets fail assert put modify unless select alternative assert_opt gets_the
-  returnOk throwError lift bindE liftE whenE unlessE throw_opt assertE liftM liftME sequence_x
-  zipWithM_x mapM_x sequence mapM sequenceE_x sequenceE mapME mapME_x catch select_f
-  handleE' handleE handle_elseE forM forM_x zipWithM filterM forME_x
   withoutFailure throw catchFailure rethrowFailure capFaultOnFailure lookupErrorOnFailure
-  nullCapOnFailure nothingOnFailure without_preemption withoutPreemption preemptionPoint
-  cap_fault_on_failure lookup_error_on_failure const_on_failure ignore_failure ignoreFailure
-  empty_on_failure emptyOnFailure unifyFailure unify_failure throw_on_false
-  storeWordVM loadWord setRegister getRegister getRestartPC debugPrint
-  setNextPC maskInterrupt clearMemory throw_on_false unifyFailure ignoreFailure empty_on_failure
-  emptyOnFailure clearMemoryVM null_cap_on_failure setNextPC getRestartPC assertDerived
-  throw_on_false setObject getObject updateObject loadObject)
+  nullCapOnFailure nothingOnFailure withoutPreemption preemptionPoint ignoreFailure
+  emptyOnFailure unifyFailure maskInterrupt clearMemory clearMemoryVM  assertDerived
+  setObject getObject updateObject loadObject)
 
 lemma throwE_R: "\<lbrace>\<top>\<rbrace> throw f \<lbrace>P\<rbrace>,-"
   by (simp add: validE_R_def) wp
