@@ -4823,7 +4823,7 @@ lemma mdb_inv_preserve_updateCap:
                   split: if_splits)
   apply (intro conjI impI allI)
       apply fastforce
-     apply (simp add: ARM_HYP.isCap_defs)
+     apply (simp add: ARM_HYP.isCap_defs) (* FIXME arch-split *)
     apply (simp add: sameRegionAs_update_untyped)
    apply (rule ext,simp add:sameRegionAs_update_untyped')
   apply (simp add:mdb_next_def split:if_splits)
