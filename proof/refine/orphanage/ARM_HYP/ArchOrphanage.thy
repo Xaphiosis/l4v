@@ -13,7 +13,7 @@ context Arch begin arch_global_naming
 
 clear_named_theorems Arch_assms (* accumulate assumptions for Orphanage locale *)
 
-crunch vgicUpdateLR, vcpuSave, setGlobalUserVSpace
+crunch vgicUpdateLR, vcpuSave
   for no_orphans[wp]: "no_orphans"
   (wp: no_orphans_lift crunch_wps)
 
@@ -34,16 +34,13 @@ lemma switchToIdleThread_no_orphans'[Arch_assms, wp]:
   apply (force simp: is_active_tcb_ptr_def st_tcb_at_neg' typ_at_tcb')
   done
 
-crunch getVMID, Arch.switchToThread
+crunch Arch.switchToThread
   for ksCurThread[Arch_assms, wp]: "\<lambda> s. P (ksCurThread s)"
-  (wp: crunch_wps getObject_inv loadObject_default_inv findVSpaceForASID_vs_at_wp
-   simp: getThreadVSpaceRoot_def if_distribR
+  (wp: crunch_wps getObject_inv loadObject_default_inv
+   simp: getThreadVSpaceRoot_def if_distribR if_apply_def2
    cong: if_cong)
 
-crunch lazyFpuRestore
-  for tcbQueued[wp]: "\<lambda>s. Q (obj_at' (\<lambda>tcb. P (tcbQueued tcb)) tcb_ptr s)"
-
-crunch updateASIDPoolEntry, Arch.switchToThread
+crunch Arch.switchToThread
   for no_orphans[Arch_assms, wp]: "no_orphans"
   (wp: no_orphans_lift crunch_wps)
 
@@ -67,7 +64,7 @@ crunch Arch.switchToThread
   and ksSchedulerAction[wp]: "\<lambda>s. P (ksSchedulerAction s)"
   (wp: getASID_wp crunch_wps simp: crunch_simps)
 
-crunch vcpuFlush, switchLocalFpuOwner, updatePTType
+crunch vcpuFlush, copyGlobalMappings
   for no_orphans[wp]: no_orphans
   (wp: no_orphans_lift crunch_wps)
 
@@ -78,7 +75,7 @@ crunch vcpuFlush, prepareNextDomain
   and ct'[Arch_assms, wp]: "\<lambda>s. P (ksCurThread s)"
   (wp:  crunch_wps simp: Let_def)
 
-crunch invalidateVMIDEntry, invalidateASID, invalidateASIDEntry
+crunch invalidateASID, invalidateASIDEntry
   for tcbQueued[wp]: "obj_at' (\<lambda>tcb. P (tcbQueued tcb)) tcb_ptr"
 
 lemma createNewCaps_no_orphans_arch[Arch_assms]:
@@ -96,7 +93,7 @@ lemma createNewCaps_no_orphans_arch[Arch_assms]:
         apply (case_tac apiobject_type; simp)
             apply (wpsimp wp: mapM_x_wp'
                    | clarsimp simp: projectKO_opt_tcb APIType_capBits_def Arch_createNewCaps_def
-                   | simp add: objBits_simps mult_2 nat_arith.add1 split: if_split)+
+                   | simp add: objBits_simps mult_2 nat_arith.add1 vspace_bits_defs split: if_split)+
   done
 
 crunch Arch.postCapDeletion
@@ -112,7 +109,7 @@ lemma arch_createObject_no_orphans[Arch_assms]:
                 simp: placeNewObject_def2 placeNewDataObject_def
                       is_active_thread_state_def makeObject_tcb projectKO_opt_tcb
                 split_del: if_split)
-  apply (clarsimp simp:  APIType_capBits_def objBits_simps bit_simps
+  apply (clarsimp simp:  APIType_capBits_def objBits_simps vspace_bits_defs
                   split: object_type.split_asm if_splits)
   done
 
@@ -166,7 +163,7 @@ lemma handleReservedIRQ_no_orphans[Arch_assms, wp]:
 crunch maskIrqSignal
   for no_orphans[Arch_assms, wp]: no_orphans
 
-crunch invalidateASIDEntry, invalidateTLBByASID
+crunch invalidateASIDEntry, invalidateTLBByASID, flushSpace
   for no_orphans[wp]: no_orphans
   (wp: no_orphans_lift)
 
@@ -196,16 +193,17 @@ crunch dissociateVCPUTCB
   for tcbQueued_inv[wp]: "\<lambda>s. obj_at' (\<lambda>tcb. P (tcbQueued tcb)) t s"
   (wp: threadGet_wp crunch_wps asUser_tcbQueued_inv simp: crunch_simps)
 
-crunch modifyArchState, vcpuUpdate, archThreadSet, dissociateVCPUTCB, vcpuFinalise
+crunch modifyArchState, vcpuUpdate, archThreadSet, dissociateVCPUTCB, vcpuFinalise, setVMRootForFlush,
+       storePDE, storePTE
   for no_orphans[wp]: "no_orphans"
   (wp: no_orphans_lift crunch_wps)
 
-crunch postSetFlags, prepareSetDomain, handleSpuriousIRQ, unmapPage
+crunch postSetFlags, prepareSetDomain, handleSpuriousIRQ
   for no_orphans[Arch_assms, wp]: no_orphans
 
-crunch unmapPageTable, prepareThreadDelete
+crunch unmapPageTable, prepareThreadDelete, unmapPage
   for no_orphans[Arch_assms, wp]: "no_orphans"
-  (wp: lookupPTSlotFromLevel_inv)
+  (wp: crunch_wps)
 
 lemma setASIDPool_no_orphans [wp]:
   "setObject p (ap :: asidpool) \<lbrace> no_orphans \<rbrace>"
@@ -221,7 +219,7 @@ lemma no_orphans_arch_finalise_prop_stuff[Arch_assms]:
   by (simp add: arch_finalise_prop_stuff_def)
 
 crunch performIRQControl, InterruptDecls_H.invokeIRQHandler, performPageTableInvocation,
-         performVSpaceInvocation, performPageInvocation, handleVMFault
+       performPageDirectoryInvocation, performPageInvocation, handleVMFault
   for no_orphans[Arch_assms, wp]: no_orphans
   (wp: crunch_wps simp: crunch_simps)
 
@@ -229,7 +227,7 @@ lemma handleHypervisorFault_no_orphans[Arch_assms, wp]:
   "\<lbrace>\<lambda>s. valid_objs' s \<and> sch_act_wf (ksSchedulerAction s) s \<and> no_orphans s\<rbrace>
    handleHypervisorFault w f
    \<lbrace>\<lambda>_. no_orphans\<rbrace>"
-  unfolding handleHypervisorFault_def isFpuEnable_def
+  unfolding handleHypervisorFault_def
   by (wpsimp wp: undefined_valid)
 
 lemma associateVCPUTCB_no_orphans[wp]:
@@ -241,7 +239,7 @@ crunch invokeVCPUInjectIRQ, invokeVCPUWriteReg, invokeVCPUAckVPPI, performARMVCP
   for no_orphans [wp]: "no_orphans"
   (wp: crunch_wps simp: crunch_simps)
 
-crunch performASIDPoolInvocation, performSMCInvocation
+crunch performASIDPoolInvocation
   for no_orphans[wp]: no_orphans
   (wp: getObject_inv loadObject_default_inv)
 
@@ -263,7 +261,7 @@ lemma performASIDControlInvocation_no_orphans [wp]:
                      "ctes_of s cref = Some ut_cte" "cteCap ut_cte = capability.UntypedCap False ptr_base pageBits idx"
     and  desc      : "descendants_of' cref (ctes_of s) = {}"
     and  misc      : "p \<noteq> cref" "ex_cte_cap_wp_to' (\<lambda>_. True) p s" "sch_act_simple s" "is_aligned ptr asid_low_bits"
-                     "asid_wf ptr" "ct_active' s"
+                     "(ptr::machine_word) < 2 ^ asid_bits" "ct_active' s"
 
   have vc:"s \<turnstile>' UntypedCap False ptr_base pageBits idx"
     using cte misc invs'
