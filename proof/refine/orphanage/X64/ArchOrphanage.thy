@@ -1,5 +1,6 @@
 (*
- * Copyright 2014, General Dynamics C4 Systems
+ * Copyright 2020, Data61, CSIRO (ABN 41 687 119 230)
+ * Copyright 2026, Proofcraft Pty Ltd
  *
  * SPDX-License-Identifier: GPL-2.0-only
  *)
@@ -26,7 +27,7 @@ lemma switchToIdleThread_no_orphans'[Arch_assms, wp]:
         \<and> (is_active_tcb_ptr (ksCurThread s) s \<longrightarrow> ksCurThread s \<in> all_queued_tcb_ptrs s)\<rbrace>
    switchToIdleThread
    \<lbrace>\<lambda>_. no_orphans\<rbrace>"
-  apply (clarsimp simp: switchToIdleThread_def ARM_H.switchToIdleThread_def setCurThread_def)
+  apply (clarsimp simp: switchToIdleThread_def X64_H.switchToIdleThread_def setCurThread_def)
   apply (simp add: no_orphans_disj all_queued_tcb_ptrs_def)
   apply (wpsimp wp: hoare_vcg_all_lift hoare_vcg_disj_lift
                     hoare_drop_imp[where Q'="\<lambda>_. idleThreadNotQueued"] hoare_vcg_imp_lift')
@@ -106,7 +107,7 @@ lemma arch_createObject_no_orphans[Arch_assms]:
     and K (range_cover ptr sz (APIType_capBits tp us) (Suc 0)) and no_orphans\<rbrace>
    Arch.createObject tp ptr us d
    \<lbrace>\<lambda>_. no_orphans\<rbrace>"
-  unfolding ARM_H.createObject_def
+  unfolding X64_H.createObject_def
   apply (wpsimp wp: createObjects'_wp_subst createObjects_no_orphans[where sz=sz]
                 simp: placeNewObject_def2 placeNewDataObject_def
                       is_active_thread_state_def makeObject_tcb projectKO_opt_tcb
@@ -149,7 +150,7 @@ lemma vppiEvent_no_orphans[wp]:
   unfolding vppiEvent_def Let_def
   by (wpsimp wp: hoare_vcg_imp_lift' sch_act_wf_lift | wps)+
 
-(* FIXME ARM: move *)
+(* FIXME X64: move *)
 lemma irqVPPIEventIndex_irqVGICMaintenance_None[simp]:
   "irqVPPIEventIndex irqVGICMaintenance = None"
   unfolding irqVTimerEvent_def irqVGICMaintenance_def IRQ_def irqVPPIEventIndex_def
@@ -322,7 +323,7 @@ lemma arch_performInvocation_no_orphans[Arch_assms, wp]:
   "\<lbrace> \<lambda>s. no_orphans s \<and> invs' s \<and> valid_arch_inv' i s \<and> ct_active' s \<rbrace>
    Arch.performInvocation i
    \<lbrace> \<lambda>_. no_orphans \<rbrace>"
-  unfolding ARM_H.performInvocation_def performARMMMUInvocation_def performSGISignalGenerate_def
+  unfolding X64_H.performInvocation_def performARMMMUInvocation_def performSGISignalGenerate_def
   by (wpsimp simp: valid_arch_inv'_def)
 
 crunch prepareSetDomain
@@ -337,7 +338,7 @@ end (* Arch *)
 
 interpretation Orphanage?: Orphanage
 proof goal_cases
-  case 1 show ?case by (intro_locales; (unfold_locales; (fact ARM.Orphanage_assms)?)?)
+  case 1 show ?case by (intro_locales; (unfold_locales; (fact X64.Orphanage_assms)?)?)
 qed
 
 end
