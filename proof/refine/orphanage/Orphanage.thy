@@ -1123,11 +1123,12 @@ lemma sts_tcb_at'_preserve':
   by (wpsimp wp: sts_st_tcb' simp: st_tcb_at_neg')
 
 locale Orphanage =
-  assumes switchToIdleThread_no_orphans'[wp]:
-    "\<lbrace>\<lambda>s. no_orphans s
-          \<and> (is_active_tcb_ptr (ksCurThread s) s \<longrightarrow> ksCurThread s \<in> all_queued_tcb_ptrs s)\<rbrace>
-     switchToIdleThread
-     \<lbrace>\<lambda>_. no_orphans\<rbrace>"
+  assumes arch_switchToIdleThread_st_tcb_at'[wp]:
+    "\<And>P P' p. Arch.switchToIdleThread \<lbrace>\<lambda>s. P (st_tcb_at' P' p s)\<rbrace>"
+  assumes arch_switchToIdleThread_obj_at'_tcb[wp]:
+    "\<And>P (P' :: tcb \<Rightarrow> _) p. Arch.switchToIdleThread \<lbrace>\<lambda>s. P (obj_at' P' p s)\<rbrace>"
+  assumes arch_switchToIdleThread_ksSchedulerAction[wp]:
+    "\<And>P. Arch.switchToIdleThread \<lbrace>\<lambda>s. P (ksSchedulerAction s)\<rbrace>"
   assumes arch_switchToThread_no_orphans[wp]:
     "\<And>t. Arch.switchToThread t \<lbrace>no_orphans\<rbrace>"
   assumes arch_switchToThread_ksCurThread[wp]:
@@ -1141,7 +1142,7 @@ locale Orphanage =
   assumes prepareNextDomain_ct'[wp]:
     "\<And>P. Arch.prepareNextDomain \<lbrace>\<lambda>s. P (ksCurThread s)\<rbrace>"
   assumes prepareNextDomain_st_tcb_at'[wp]:
-    "\<And>P P'. Arch.prepareNextDomain \<lbrace>\<lambda>s. P (st_tcb_at' P' p s)\<rbrace>"
+    "\<And>P p P'. Arch.prepareNextDomain \<lbrace>\<lambda>s. P (st_tcb_at' P' p s)\<rbrace>"
   assumes prepareNextDomain_tcbQueued[wp]:
     "\<And>P Q tcb_ptr. Arch.prepareNextDomain \<lbrace>\<lambda>s. Q (obj_at' (\<lambda>tcb. P (tcbQueued tcb)) tcb_ptr s)\<rbrace>"
   assumes createNewCaps_no_orphans_arch:
@@ -1220,6 +1221,18 @@ lemma ThreadDecls_H_switchToThread_no_orphans:
   by (wpsimp wp: setCurThread_almost_no_orphans hoare_vcg_imp_lift'
                  tcbSchedDequeue_all_queued_tcb_ptrs_other
       | wps)+
+
+lemma switchToIdleThread_no_orphans'[wp]:
+  "\<lbrace>\<lambda>s. no_orphans s
+        \<and> (is_active_tcb_ptr (ksCurThread s) s \<longrightarrow> ksCurThread s \<in> all_queued_tcb_ptrs s)\<rbrace>
+   switchToIdleThread
+   \<lbrace>\<lambda>_. no_orphans\<rbrace>"
+  apply (clarsimp simp: switchToIdleThread_def setCurThread_def no_orphans_disj all_queued_tcb_ptrs_def)
+  apply (wpsimp wp: hoare_vcg_all_lift hoare_vcg_disj_lift
+                    hoare_drop_imp[where Q'="\<lambda>_. idleThreadNotQueued"] hoare_vcg_imp_lift'
+                simp: typ_at_tcb')
+  apply (force simp: is_active_tcb_ptr_def st_tcb_at_neg' typ_at_tcb')
+  done
 
 (* ksSchedulerAction s = ChooseNewThread *)
 lemma chooseThread_no_orphans[wp]:

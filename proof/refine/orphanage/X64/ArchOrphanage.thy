@@ -5,6 +5,10 @@
  * SPDX-License-Identifier: GPL-2.0-only
  *)
 
+(* Proof that calling the kernel never leaves threads orphaned: architecture-specific parts.
+   More specifically, every active thread must be the current thread,
+   or about to be switched to, or be in a scheduling queue. *)
+
 theory ArchOrphanage
 imports Orphanage
 begin
@@ -17,23 +21,17 @@ crunch doMachineOp
   for tcb_in_cur_domain'[wp]: "tcb_in_cur_domain' t"
   (wp: tcb_in_cur_domain'_lift)
 
-lemma switchToIdleThread_no_orphans'[Arch_assms, wp]:
-  "\<lbrace>\<lambda>s. no_orphans s
-        \<and> (is_active_tcb_ptr (ksCurThread s) s \<longrightarrow> ksCurThread s \<in> all_queued_tcb_ptrs s)\<rbrace>
-   switchToIdleThread
-   \<lbrace>\<lambda>_. no_orphans\<rbrace>"
-  apply (clarsimp simp: switchToIdleThread_def X64_H.switchToIdleThread_def setCurThread_def)
-  apply (simp add: no_orphans_disj all_queued_tcb_ptrs_def)
-  apply (wpsimp wp: hoare_vcg_all_lift hoare_vcg_disj_lift
-                    hoare_drop_imp[where Q'="\<lambda>_. idleThreadNotQueued"] hoare_vcg_imp_lift')
-  apply (force simp: is_active_tcb_ptr_def st_tcb_at_neg' typ_at_tcb')
-  done
-
-crunch Arch.switchToThread
-  for ksCurThread[Arch_assms, wp]: "\<lambda> s. P (ksCurThread s)"
+crunch Arch.switchToThread, Arch.switchToIdleThread
+  for ksCurThread[Arch_assms, wp]: "\<lambda>s. P (ksCurThread s)"
+  and all_queued_tcb_ptrs[Arch_assms, wp]: "\<lambda>s. P (t \<in> all_queued_tcb_ptrs s)"
+  and ksSchedulerAction[Arch_assms, wp]: "\<lambda>s. P (ksSchedulerAction s)"
+  and st_tcb_at'[Arch_assms, wp]: "\<lambda>s. P (st_tcb_at' P' p s)"
   (wp: crunch_wps getObject_inv loadObject_default_inv findVSpaceForASID_vs_at_wp
    simp: getThreadVSpaceRoot_def if_distribR
    cong: if_cong)
+
+crunch Arch.switchToIdleThread
+  for obj_at'_tcb[Arch_assms, wp]: "\<lambda>s. P (obj_at' (P' :: tcb \<Rightarrow> _) p s)"
 
 crunch lazyFpuRestore
   for tcbQueued[wp]: "\<lambda>s. Q (obj_at' (\<lambda>tcb. P (tcbQueued tcb)) tcb_ptr s)"
@@ -50,11 +48,6 @@ lemma setASID_all_queued_tcb_ptrs[wp]:
    apply simp
   apply (clarsimp simp: obj_at'_def ko_wp_at'_def)
   done
-
-crunch Arch.switchToThread
-  for all_queued_tcb_ptrs[Arch_assms, wp]: "\<lambda>s. P (t \<in> all_queued_tcb_ptrs s)"
-  and ksSchedulerAction[wp]: "\<lambda>s. P (ksSchedulerAction s)"
-  (wp: getASID_wp crunch_wps simp: crunch_simps)
 
 crunch prepareNextDomain
   for no_orphans[Arch_assms, wp]: no_orphans
